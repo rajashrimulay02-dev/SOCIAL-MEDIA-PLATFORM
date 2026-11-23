@@ -1,0 +1,63 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Profile - MiniSocial</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<header id="nav"></header>
+<main>
+  <div class="box" id="profile">Loading...</div>
+  <div class="box" id="editBox" style="display:none">
+    <h3>Edit Profile</h3>
+    <label>Name</label><input id="editName">
+    <label>Bio</label><textarea id="editBio" rows="2" maxlength="160"></textarea>
+    <button class="btn" onclick="saveProfile()">Save</button>
+    <button class="btn gray" onclick="editBox.style.display='none'">Cancel</button>
+  </div>
+  <h3 style="margin-bottom:10px">Posts</h3>
+  <div id="feed"></div>
+</main>
+<script src="app.js"></script>
+<script>
+const uid = new URLSearchParams(location.search).get('id');
+let user;
+
+async function load() {
+  await renderNav();
+  try { user = await api('/api/users/' + uid); }
+  catch (e) { profile.textContent = e.message; return; }
+  const isMe = ME && ME.id === user.id;
+  profile.innerHTML = `
+    <div class="avatar">${esc(user.name[0].toUpperCase())}</div>
+    <h2>${esc(user.name)}</h2><small>@${esc(user.username)}</small>
+    <p style="margin:10px 0">${user.bio ? esc(user.bio) : '<i>No bio yet</i>'}</p>
+    <div class="stats">
+      <div><b>${user.posts}</b>Posts</div>
+      <div><b id="followersCount">${user.followers}</b>Followers</div>
+      <div><b>${user.following}</b>Following</div>
+    </div>
+    ${isMe ? '<button class="btn outline" onclick="openEdit()">Edit Profile</button>'
+           : `<button class="btn ${user.isFollowing ? 'gray' : ''}" id="followBtn" onclick="toggleFollow()">${user.isFollowing ? 'Unfollow' : 'Follow'}</button>`}`;
+  const posts = await api('/api/posts?user=' + uid);
+  feed.innerHTML = posts.length ? posts.map(postHTML).join('') : '<div class="box">No posts yet.</div>';
+}
+
+async function toggleFollow() {
+  if (!ME) { location.href = '/login.html'; return; }
+  try {
+    const r = await api(`/api/users/${uid}/follow`, 'POST');
+    followBtn.textContent = r.isFollowing ? 'Unfollow' : 'Follow';
+    followBtn.className = 'btn' + (r.isFollowing ? ' gray' : '');
+    followersCount.textContent = +followersCount.textContent + (r.isFollowing ? 1 : -1);
+  } catch (e) { alert(e.message); }
+}
+
+function openEdit() {
+  editName.value = user.name; editBio.value = user.bio || '';
+  editBox.style.display = 'block';
+}
+
+async function saveProfile() {
+  try { await api('/api/me', 'PUT', { name: editName.value, bio: editBio.value }); location.reload(); }
+  catch (e) { alert(e.message); }
+}
+load();
+</script>
+</body></html>
